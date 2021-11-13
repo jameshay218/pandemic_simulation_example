@@ -6,6 +6,7 @@ library(ggplot2)
 library(tidyverse)
 library(shiny)
 library(getTBinR)
+library(patchwork)
 
 source("code/auxiliary_funcs.R")
 source("code/sir_functions.R")
@@ -15,6 +16,8 @@ age_distribution <- read_csv("parameters/age_distribution.csv")
 data("polymod")
 N_props1 <- age_distribution$age_dist
 age_dat <- data.frame(lower.age.limit=seq(0,80,by=10),population=N_props1)
+beta_scales <- age_distribution$infectivity
+alphas1 <- age_distribution$susceptibility
 polymod$contacts <- polymod$contacts %>% group_by(part_id) %>% sample_n(5,replace=TRUE)
 polymod_c <- contact_matrix(polymod,survey.pop=age_dat,age.limits = seq(0,80,by=10),symmetric=TRUE,
                             missing.contact.age = "sample",
@@ -73,16 +76,15 @@ shinyServer(function(input, output, session) {
         N <- matrix(N_props*N_tot,ncol=1,nrow=N_age_classes)
         
         N_props_long <- N_props
-        N <- matrix(N_props_long*N_tot,ncol=length(alphas),nrow=N_age_classes)
-        print(N)
+        N <- matrix(N_props_long*N_tot,ncol=1,nrow=N_age_classes)
         C_use <- setup_C(C, N, beta_scales)
         beta_par <- get_beta_vector(C,age_dat$population,gamma, R0,beta_scales)
         get_R0_vector(C,age_dat$population,gamma, R0,beta_scales)
         
-        y_base <- epi_ode_size(C_use, beta_par, gamma, alpha, N, ts=ts,
-                               alphas=alphas1, age_seed=4,immunity_seed=1,seed_size=I0,return_full=TRUE)
-        y_end <- epi_ode_size(C_use, beta_par, gamma, alpha, N, ts=ts,
-                               alphas=alphas1, age_seed=4,immunity_seed=1,seed_size=I0,return_full=FALSE)
+        y_base <- epi_ode_size(C_use, beta_par, gamma, Ta=alpha, N, ts=ts,
+                               alphas=alphas1, age_seed=4,immunity_seed=1,return_full=TRUE,seed_size=I0)
+        y_end <- epi_ode_size(C_use, beta_par, gamma, Ta=alpha, N, ts=ts,
+                               alphas=alphas1, age_seed=4,immunity_seed=1,return_full=FALSE,seed_size=I0)
         print(y_end)
         incidence <- y_base[,which(colnames(y_base)=="new_infs")]
         incidence <- as.data.frame(apply(incidence, 2, function(x) c(0,diff(x))))
